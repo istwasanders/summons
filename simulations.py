@@ -51,7 +51,7 @@ class Summons:
         #Generate random for each of the ten pulls
         results = [random.random() for x in range(10)]
         
-        #100 previous summons guarantees a 5*
+        #Rate of 9% means next pull is tenfold
         if(self.rate >= 0.09):
             results[0] = 0
         
