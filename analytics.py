@@ -26,10 +26,9 @@ class SummonMatrix:
         self.baserate = baserate
         self.rate = baserate
         self.singles = singles
-        #self.varieties = singles + 11 - singles/10
-        #self.transition_matrix = ([[0 for x in range(self.varieties)] for y in range(self.varieties)])
         self.modified_transition = 0
         
+        #Compute summon varieties, and set up the framework for the transition matrix
         rate = baserate
         pulls = 0
         self.varieties = 0
@@ -80,44 +79,67 @@ class SummonMatrix:
                 self.transition_matrix[x+1][x] = (1-self.rate) ** 10                #Probability of no 5*
                 self.transition_matrix[0][x]   = 1 - self.transition_matrix[x+1][x] #Probability of yes 5*
                 
-                #The 
+                #The pity rate always goes up after a tenfold
                 counter += 10
                 self.rate += 0.005
-            #self.transition_matrix[x][x] -= 1
-        #for x in range(self.varieties - 1):
-        #    self.modified_transition
-        #for x in range(self.varieties):
-        #    self.transition_matrix[0][x] += 1
-            
-        #self.transition_matrix[-1][-1] = -1
-            
+        
+        #Set up a modified transition matrix to calculate the variety distribution
         self.modified_transition = numpy.array(self.transition_matrix)
-        for x in range(self.varieties - 1):
-            self.modified_transition[x][x] -= 1
+        
+        #Calculations for variety distributions are as follows:
+        #Preliminary information:
+        #   The matrix A represents the transition matrix
+        #   We want to determine long term summon results
+        #   The vector x_n represents pull distribution for the nth summon
+        #
+        #   Performing a summon is represented by multiplying A*x
+        #In order to determine long term summon results (or x_infinity):
+        #   We wish to find when x_(n+1)
+        #   This is equivalent to solving   A*x = I*x
+        #   Which we can rework into (A-I)*x = 0
+        #   We have a secret weapon, which is that the sum of elements in x should be 1
         for x in range(self.varieties):
+            #This line handles (A-I)
+            self.modified_transition[x][x] -= 1
+            
+            #This line uses our secret weapon
             self.modified_transition[0][x] += 1
-        self.modified_transition[-1][-1] = -1
+            
         self.rate = self.baserate
         
+        #Invert the matrix to solve the system
         return numpy.linalg.inv(self.modified_transition)[:,0]
     
     #For each pull variety, this function calculates the distribution of 5* units within that pull
     def pull_distribution(self):
+        #Each time the summon button is pressed, between 0 and 10 5* units are summoned
         pull_matrix = ([[0 for x in range(11)] for y in range(self.varieties)])
+        
+        #Start at base 5* rate and 0 units summoned this pity reset
         rate = self.baserate
         pullcount = 0
+        
+        #Fill out the distribution of 5* pulls at various pity rates
         for x in range(self.varieties - 1):
             if(x < self.singles):
                 thiscount = 1
             else:
                 thiscount = 10
             for y in range(11):
+                #Pull distribution follows the binomial distribution at the associated pity rate
+                #With 1 trial for a single summon, and 10 trials for a tenfold summon
                 pull_matrix[x][y] = binom_dist(thiscount,rate,y)
                 
             pullcount += thiscount
+            #Increment the pity either after 10 pulls or at the appropriate single summon
             if(thiscount >= 10 or pullcount % 10 == 0):
                 rate += 0.005
+                
+        #The pull with a guaranteed 5* is a little different
+        #When guaranteed 5*, a pull has probability 0 of having 0 5*
         pull_matrix[-1][0] = 0
+        
+        #The number of 5* pulled follows the binomial distribution with 9 trials
         for y in range(11):
             pull_matrix[-1][y] = binom_dist(9,rate,y-1)
             
